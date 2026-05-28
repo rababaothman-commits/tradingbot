@@ -1,5 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 import yfinance as yf
 
 TOKEN = "8456213095:AAEJTfNQJ5ncz3h_DKeeECfcqGtnYJLLEz4"
@@ -30,20 +30,29 @@ def get_data(pair):
         if loss == 0:
             rsi = 100.0
         else:
-            rsi = round(100-(100/(1+gain/loss)),1)
+            rsi = round(100 - (100 / (1 + gain / loss)), 1)
         sma = h['Close'].rolling(20).mean().iloc[-1]
         trend = "UP" if c > sma else "DOWN"
-        piv = round((hi+lo+c)/3,2)
-        r1 = round(2*piv-lo,2)
-        r2 = round(piv+(hi-lo),2)
-        s1 = round(2*piv-hi,2)
-        s2 = round(piv-(hi-lo),2)
+        piv = round((hi + lo + c) / 3, 2)
+        r1 = round(2 * piv - lo, 2)
+        r2 = round(piv + (hi - lo), 2)
+        s1 = round(2 * piv - hi, 2)
+        s2 = round(piv - (hi - lo), 2)
         if rsi < 30:
-            sig="BUY"; entry=c; tp=round(c*1.005,2); sl=round(c*0.997,2)
+            sig = "BUY"
+            entry = c
+            tp = round(c * 1.005, 2)
+            sl = round(c * 0.997, 2)
         elif rsi > 70:
-            sig="SELL"; entry=c; tp=round(c*0.995,2); sl=round(c*1.003,2)
+            sig = "SELL"
+            entry = c
+            tp = round(c * 0.995, 2)
+            sl = round(c * 1.003, 2)
         else:
-            sig="WAIT"; entry=None; tp=None; sl=None
+            sig = "WAIT"
+            entry = None
+            tp = None
+            sl = None
         return {"c":c,"trend":trend,"rsi":rsi,"r1":r1,"r2":r2,"s1":s1,"s2":s2,"sig":sig,"entry":entry,"tp":tp,"sl":sl}
     except:
         return None
@@ -57,26 +66,27 @@ def kb():
         [InlineKeyboardButton("OIL",callback_data="OIL")]
     ])
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Trading Bot\nChoose pair:",reply_markup=kb())
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text("Trading Bot - Choose pair:", reply_markup=kb())
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def button(update: Update, context: CallbackContext):
     q = update.callback_query
-    await q.answer()
+    q.answer()
     if q.data == "back":
-        await q.edit_message_text("Trading Bot\nChoose pair:",reply_markup=kb())
+        q.edit_message_text("Trading Bot - Choose pair:", reply_markup=kb())
         return
     d = get_data(q.data)
     if not d:
-        await q.edit_message_text("Error - try again")
+        q.edit_message_text("Error - try again")
         return
     msg = f"{q.data}\nPrice:{d['c']}\nTrend:{d['trend']}\nRSI:{d['rsi']}\nR1:{d['r1']} R2:{d['r2']}\nS1:{d['s1']} S2:{d['s2']}\nSignal:{d['sig']}"
     if d['entry']:
         msg += f"\nEntry:{d['entry']} TP:{d['tp']} SL:{d['sl']}"
-    await q.edit_message_text(msg,reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back",callback_data="back")]]))
+    q.edit_message_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back",callback_data="back")]]))
 
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start",start))
-app.add_handler(CallbackQueryHandler(button))
+updater = Updater(TOKEN)
+updater.dispatcher.add_handler(CommandHandler("start", start))
+updater.dispatcher.add_handler(CallbackQueryHandler(button))
 print("Bot is running!")
-app.run_polling(drop_pending_updates=True)
+updater.start_polling()
+updater.idle()
