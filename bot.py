@@ -5,20 +5,20 @@ import yfinance as yf
 TOKEN = "8456213095:AAEJTfNQJ5ncz3h_DKeeECfcqGtnYJLLEz4"
 
 PAIRS = {
-    "GOLD": "GC=F",
-    "SILVER": "SI=F",
-    "NASDAQ": "NQ=F",
-    "DOW_JONES": "YM=F",
-    "EURUSD": "EURUSD=X",
-    "USDJPY": "USDJPY=X",
-    "GBPUSD": "GBPUSD=X",
-    "BITCOIN": "BTC-USD",
-    "OIL": "CL=F"
+    "GOLD": {"symbol": "GC=F", "name": "XAUUSD 🥇", "ar": "الذهب"},
+    "SILVER": {"symbol": "SI=F", "name": "XAGUSD 🥈", "ar": "الفضة"},
+    "NASDAQ": {"symbol": "NQ=F", "name": "NASDAQ 📊", "ar": "ناسداك"},
+    "DOW_JONES": {"symbol": "YM=F", "name": "US30 📈", "ar": "داو جونز"},
+    "EURUSD": {"symbol": "EURUSD=X", "name": "EUR/USD 🇪🇺", "ar": "يورو/دولار"},
+    "USDJPY": {"symbol": "USDJPY=X", "name": "USD/JPY 🇯🇵", "ar": "دولار/ين"},
+    "GBPUSD": {"symbol": "GBPUSD=X", "name": "GBP/USD 🇬🇧", "ar": "جنيه/دولار"},
+    "BITCOIN": {"symbol": "BTC-USD", "name": "BITCOIN ₿", "ar": "بيتكوين"},
+    "OIL": {"symbol": "CL=F", "name": "USOIL 🛢️", "ar": "النفط"}
 }
 
 def get_data(pair):
     try:
-        h = yf.Ticker(PAIRS[pair]).history(period="1mo", interval="1d")
+        h = yf.Ticker(PAIRS[pair]["symbol"]).history(period="1mo", interval="1d")
         if h.empty:
             return None
         c = round(h['Close'].iloc[-1], 2)
@@ -32,30 +32,33 @@ def get_data(pair):
         else:
             rsi = round(100 - (100 / (1 + gain / loss)), 1)
         sma = h['Close'].rolling(20).mean().iloc[-1]
-        trend = "UP" if c > sma else "DOWN"
+        trend = "🔼 صاعد" if c > sma else "🔽 هابط"
         piv = round((hi + lo + c) / 3, 2)
         r1 = round(2 * piv - lo, 2)
         r2 = round(piv + (hi - lo), 2)
+        r3 = round(hi + 2 * (piv - lo), 2)
         s1 = round(2 * piv - hi, 2)
         s2 = round(piv - (hi - lo), 2)
+        s3 = round(lo - 2 * (hi - piv), 2)
         if rsi < 30:
-            sig = "BUY"
+            sig = "🟢 شراء"
             entry = c
             tp = round(c * 1.005, 2)
             sl = round(c * 0.997, 2)
         elif rsi > 70:
-            sig = "SELL"
+            sig = "🔴 بيع"
             entry = c
             tp = round(c * 0.995, 2)
             sl = round(c * 1.003, 2)
         else:
-            sig = "WAIT"
+            sig = "⏸️ انتظار"
             entry = None
             tp = None
             sl = None
         return {
             "c": c, "trend": trend, "rsi": rsi,
-            "r1": r1, "r2": r2, "s1": s1, "s2": s2,
+            "r1": r1, "r2": r2, "r3": r3,
+            "s1": s1, "s2": s2, "s3": s3,
             "sig": sig, "entry": entry, "tp": tp, "sl": sl
         }
     except:
@@ -63,55 +66,93 @@ def get_data(pair):
 
 def kb():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("GOLD", callback_data="GOLD"),
-         InlineKeyboardButton("SILVER", callback_data="SILVER")],
-        [InlineKeyboardButton("NASDAQ", callback_data="NASDAQ"),
-         InlineKeyboardButton("DOW JONES", callback_data="DOW_JONES")],
-        [InlineKeyboardButton("EUR/USD", callback_data="EURUSD"),
-         InlineKeyboardButton("USD/JPY", callback_data="USDJPY")],
-        [InlineKeyboardButton("GBP/USD", callback_data="GBPUSD"),
-         InlineKeyboardButton("BITCOIN", callback_data="BITCOIN")],
-        [InlineKeyboardButton("OIL", callback_data="OIL")]
+        [InlineKeyboardButton("🌍 الكل", callback_data="ALL")],
+        [InlineKeyboardButton("🥇 GOLD", callback_data="GOLD"),
+         InlineKeyboardButton("🥈 SILVER", callback_data="SILVER")],
+        [InlineKeyboardButton("📊 NASDAQ", callback_data="NASDAQ"),
+         InlineKeyboardButton("📈 DOW JONES", callback_data="DOW_JONES")],
+        [InlineKeyboardButton("🇪🇺 EUR/USD", callback_data="EURUSD"),
+         InlineKeyboardButton("🇯🇵 USD/JPY", callback_data="USDJPY")],
+        [InlineKeyboardButton("🇬🇧 GBP/USD", callback_data="GBPUSD"),
+         InlineKeyboardButton("₿ BITCOIN", callback_data="BITCOIN")],
+        [InlineKeyboardButton("🛢️ OIL", callback_data="OIL")]
     ])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Trading Bot - Choose pair:",
+        "🤖 بوت إشارات التداول الاحترافي\n\n"
+        "اختر الزوج لعرض التحليل الكامل 👇",
         reply_markup=kb()
     )
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     if q.data == "back":
         await q.edit_message_text(
-            "Trading Bot - Choose pair:",
+            "🤖 بوت إشارات التداول الاحترافي\n\n"
+            "اختر الزوج لعرض التحليل الكامل 👇",
             reply_markup=kb()
         )
         return
+
+    if q.data == "ALL":
+        msg = "📊 ملخص الأسواق\n"
+        msg += "━━━━━━━━━━━━━━━━\n"
+        for key in PAIRS:
+            d = get_data(key)
+            if d:
+                msg += f"{PAIRS[key]['name']}: {d['c']} {d['trend']}\n"
+        await q.edit_message_text(
+            msg,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 رجوع", callback_data="back")]
+            ])
+        )
+        return
+
     d = get_data(q.data)
     if not d:
-        await q.edit_message_text("Error - try again")
+        await q.edit_message_text("❌ خطأ - حاول مرة أخرى")
         return
+
+    name = PAIRS[q.data]['name']
+    ar = PAIRS[q.data]['ar']
+
     msg = (
-        f"{q.data}\n"
-        f"Price: {d['c']}\n"
-        f"Trend: {d['trend']}\n"
-        f"RSI: {d['rsi']}\n"
-        f"R1: {d['r1']}  R2: {d['r2']}\n"
-        f"S1: {d['s1']}  S2: {d['s2']}\n"
-        f"Signal: {d['sig']}"
+        f"{'━'*20}\n"
+        f"📌 {name}\n"
+        f"{'━'*20}\n\n"
+        f"💰 سعر الدخول: {d['c']}\n"
+        f"📈 الاتجاه: {d['trend']}\n"
+        f"⚡ RSI: {d['rsi']}\n\n"
+        f"{'━'*20}\n"
+        f"🔴 المقاومات:\n"
+        f"  R1: {d['r1']}\n"
+        f"  R2: {d['r2']}\n"
+        f"  R3: {d['r3']}\n\n"
+        f"🟢 الدعوم:\n"
+        f"  S1: {d['s1']}\n"
+        f"  S2: {d['s2']}\n"
+        f"  S3: {d['s3']}\n\n"
+        f"{'━'*20}\n"
+        f"🎯 الإشارة: {d['sig']}\n"
     )
+
     if d['entry']:
         msg += (
-            f"\nEntry: {d['entry']}"
-            f"\nTP: {d['tp']}"
-            f"\nSL: {d['sl']}"
+            f"\n💵 سعر الدخول: {d['entry']}"
+            f"\n🎯 الهدف TP: {d['tp']}"
+            f"\n🛑 وقف الخسارة SL: {d['sl']}"
         )
+
+    msg += f"\n{'━'*20}"
+
     await q.edit_message_text(
         msg,
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("Back", callback_data="back")]
+            [InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="back")]
         ])
     )
 
